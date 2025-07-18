@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  projectName String
+  owner       String
+  progress    Float?
+  batches     Batch[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Batch {
+  id        String   @id @default(uuid())
+  batchName String
+  dueDate   DateTime
+  slaStatus  String   @default("on_track")
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  taskType     String
+  assignedUser String
+  status       String   @default("pending")
+  batch        Batch    @relation(fields: [batchId], references: [id])
+  batchId      String
+  inputs       Json[]
+  outputs      Json[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

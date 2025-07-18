@@ -1,0 +1,33 @@
+{
+    "name": "berg-be",
+    "version": "1.0.0",
+    "description": "NodeJS Backend API for multi-modal annotation platform",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js",
+        "postinstall": "prisma generate"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/BergAI/berg-be.git"
+    },
+    "keywords": [
+        "bergflow"
+    ],
+    "author": "BergAI",
+    "license": "UNLICENSED",
+    "bugs": {
+        "url": "https://github.com/BergAI/berg-be/issues"
+    },
+    "homepage": "https://github.com/BergAI/berg-be#readme",
+    "dependencies": {
+        "@prisma/client": "^6.10.1",
+        "@supabase/supabase-js": "^2.50.0",
+        "cors": "^2.8.5",
+        "dotenv": "^16.5.0",
+        "express": "^5.1.0",
+        "prisma": "^6.10.1"
+    }
+}
