@@ -1,5 +1,68 @@
 import { serviceManager } from "../services/serviceManager.js";
 
+export const updateTaskStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ["pending", "in_progress", "completed", "failed"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    // Prepare update data
+    const updateData = { status };
+
+    // If marking as completed, set completedAt timestamp
+    if (status === "completed") {
+      updateData.completedAt = new Date();
+    }
+
+    // If moving from completed to another status, clear completedAt
+    if (status !== "completed") {
+      updateData.completedAt = null;
+    }
+
+    const updatedTask = await serviceManager
+      .getTaskService()
+      .updateTask(id, updateData);
+
+    res.status(200).json(updatedTask);
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({ error: "Failed to update task status" });
+  }
+};
+
+export const updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    // If status is being updated to completed, ensure completedAt is set
+    if (updateData.status === "completed" && !updateData.completedAt) {
+      updateData.completedAt = new Date();
+    }
+
+    // If status is not completed, ensure completedAt is null
+    if (updateData.status && updateData.status !== "completed") {
+      updateData.completedAt = null;
+    }
+
+    const updated = await serviceManager
+      .getTaskService()
+      .updateTask(id, updateData);
+
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ error: "Failed to update task" });
+  }
+};
+
 export const createTask = async (req, res) => {
   try {
     const newTask = await serviceManager.getTaskService().createTask(req.body);
@@ -43,18 +106,6 @@ export const getTaskById = async (req, res) => {
   } catch (error) {
     console.error("Error fetching task:", error);
     res.status(500).json({ error: "Failed to fetch task" });
-  }
-};
-
-export const updateTask = async (req, res) => {
-  try {
-    const updated = await serviceManager
-      .getTaskService()
-      .updateTask(req.params.id, req.body);
-    res.status(200).json(updated);
-  } catch (error) {
-    console.error("Error updating task:", error);
-    res.status(500).json({ error: "Failed to update task" });
   }
 };
 

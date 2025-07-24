@@ -11,7 +11,8 @@ import {
   CircularProgress,
   Alert,
   IconButton,
-  Drawer
+  Drawer,
+  Tooltip
 } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -21,12 +22,14 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import DataTable from '../organism/DataTable/DataTable';
 import ButtonComponent from '../atoms/Button/Button';
 import SearchInput from '../molecules/SearchInput/SearchInput';
 import CreateTaskDrawer from '../organism/CreateTaskDrawer/CreateTaskDrawer';
-import { fetchTasks, deleteTask, clearErrors } from '../../features/task/taskSlice';
+import { fetchTasks, deleteTask, updateTask, updateTaskStatus, clearErrors } from '../../features/task/taskSlice';
 import { useSnackbar } from '../../hooks/useSnackbar';
 import type { RootState, AppDispatch } from '../../app/store';
 
@@ -46,7 +49,7 @@ const statusStyles = {
 
 export default function TaskTable({ batch, onBack }: TaskTableProps) {
   const dispatch = useDispatch<AppDispatch>();
-  const { items: tasks, loading, error, isDeleteLoading } = useSelector((state: RootState) => state.tasks);
+  const { items: tasks, loading, error, isDeleteLoading, isUpdateLoading, isStatusUpdateLoading } = useSelector((state: RootState) => state.tasks);
   const { success, error: showError } = useSnackbar();
   
   const [selectedTask, setSelectedTask] = useState<any>(null);
@@ -56,6 +59,7 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusUpdateLoading, setStatusUpdateLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (batch?.id) {
@@ -119,6 +123,22 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
     setSelectedTask(null);
   };
 
+  // Handle status updates
+  const handleStatusUpdate = async (taskId: string, newStatus: string) => {
+    setStatusUpdateLoading(taskId);
+    try {
+      await dispatch(updateTaskStatus({ id: taskId, status: newStatus })).unwrap();
+      
+      const statusText = newStatus.replace('_', ' ');
+      success(`Task marked as ${statusText}!`);
+      
+    } catch (error) {
+      showError('Failed to update task status. Please try again.');
+    } finally {
+      setStatusUpdateLoading(null);
+    }
+  };
+
   // Filter tasks based on search
   const filteredTasks = React.useMemo(() => {
     if (!searchQuery.trim()) return tasks;
@@ -147,6 +167,66 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
         size="small"
       />
     );
+  };
+
+  // Render status action buttons based on current status
+  const renderStatusActions = (task: any) => {
+    const { id, status } = task;
+    const isLoading = statusUpdateLoading === id;
+
+    switch (status) {
+      case 'pending':
+        return (
+          <Tooltip title="Mark as In Progress">
+            <IconButton
+              size="small"
+              onClick={() => handleStatusUpdate(id, 'in_progress')}
+              disabled={isLoading || isUpdateLoading || isStatusUpdateLoading}
+              sx={{ color: 'warning.main' }}
+            >
+              {isLoading ? (
+                <CircularProgress size={16} />
+              ) : (
+                <PlayArrowIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        );
+      
+      case 'in_progress':
+        return (
+          <Tooltip title="Mark as Completed">
+            <IconButton
+              size="small"
+              onClick={() => handleStatusUpdate(id, 'completed')}
+              disabled={isLoading || isUpdateLoading || isStatusUpdateLoading}
+              sx={{ color: 'success.main' }}
+            >
+              {isLoading ? (
+                <CircularProgress size={16} />
+              ) : (
+                <CheckCircleIcon fontSize="small" />
+              )}
+            </IconButton>
+          </Tooltip>
+        );
+      
+      case 'completed':
+        return (
+          <Chip
+            label="Complete"
+            size="small"
+            sx={{
+              backgroundColor: '#d1fae5',
+              color: '#059669',
+              fontWeight: 600
+            }}
+          />
+        );
+      
+      default:
+        return null;
+    }
   };
 
   const columns = [
@@ -188,6 +268,15 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
       )
     },
     {
+      title: 'Status Actions',
+      field: 'id',
+      render: (rowData: string, row: any) => (
+        <Box display="flex" alignItems="center" justifyContent="center">
+          {renderStatusActions(row)}
+        </Box>
+      )
+    },
+    {
       title: 'Actions',
       field: 'id',
       render: (rowData: string, row: any) => (
@@ -203,13 +292,14 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
             size="small" 
             onClick={() => handleEdit(row)}
             sx={{ color: 'warning.main' }}
+            disabled={row.status === 'completed'}
           >
             <EditOutlinedIcon fontSize="small" />
           </IconButton>
           <IconButton 
             size="small" 
             onClick={() => handleDeleteClick(rowData)}
-            disabled={isDeleteLoading}
+            disabled={isDeleteLoading || row.status === 'completed'}
             sx={{ color: 'error.main' }}
           >
             <DeleteOutlinedIcon fontSize="small" />
@@ -238,181 +328,158 @@ export default function TaskTable({ batch, onBack }: TaskTableProps) {
           </IconButton>
           <Box>
             <Typography variant="h5" fontWeight="bold">
-              All Tasks
+              Tasks - {batch?.batchName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Batch: {batch?.batchName}
+              Manage tasks for this batch
             </Typography>
           </Box>
         </Box>
-      </Box>
-
-      {/* Search and Actions */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} gap={2}>
-        <Box display="flex" gap={2} flex={1}>
-          <SearchInput
-            onSearch={handleSearch}
-            placeholder="Search task by ID or Type"
-            sx={{ maxWidth: 400 }}
-          />
+        <Box display="flex" gap={2}>
           <ButtonComponent
             buttonVariant="secondary"
             onClick={handleRefresh}
-            sx={{ whiteSpace: 'nowrap' }}
+            startIcon={<RefreshIcon />}
           >
-            <RefreshIcon sx={{ mr: 1 }} />
-            Refresh Tasks
+            Refresh
+          </ButtonComponent>
+          <ButtonComponent
+            buttonVariant="primary"
+            onClick={handleCreateNew}
+            startIcon={<AddOutlinedIcon />}
+          >
+            Create New Task
           </ButtonComponent>
         </Box>
-
-        <ButtonComponent
-          buttonVariant="primary"
-          onClick={handleCreateNew}
-        >
-          <AddOutlinedIcon sx={{ mr: 1 }} />
-          New Task
-        </ButtonComponent>
       </Box>
 
-      {/* Results Info */}
-      <Box mb={2}>
-        <Typography variant="body2" color="text.secondary">
-          Showing {filteredTasks.length} of {tasks.length} tasks
-          {searchQuery && ` matching "${searchQuery}"`}
-        </Typography>
+      {/* Search */}
+      <Box mb={3}>
+        <SearchInput 
+          placeholder="Search tasks..." 
+          onSearch={handleSearch}
+        />
       </Box>
 
-      {/* Table */}
-      <Box>
-        {loading ? (
-          <Box p={3} display="flex" alignItems="center" gap={1}>
-            <CircularProgress size={20} />
-            Loading tasks...
-          </Box>
-        ) : error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            Error: {error}
-          </Alert>
-        ) : (
-          <DataTable columns={columns} rows={rows} />
-        )}
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Task Statistics */}
+      <Box display="flex" gap={2} mb={3}>
+        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="h6" fontWeight="bold">
+            {filteredTasks.length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Total Tasks
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="h6" fontWeight="bold" color="success.main">
+            {filteredTasks.filter(task => task.status === 'completed').length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Completed
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="h6" fontWeight="bold" color="warning.main">
+            {filteredTasks.filter(task => task.status === 'in_progress').length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            In Progress
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Typography variant="h6" fontWeight="bold" color="error.main">
+            {filteredTasks.filter(task => task.status === 'pending').length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Pending
+          </Typography>
+        </Box>
       </Box>
 
-      {/* View Task Drawer */}
-      <Drawer
-        anchor="right"
-        open={showViewDrawer}
-        onClose={() => setShowViewDrawer(false)}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: 500,
-            padding: 3
-          }
-        }}
-      >
-        {selectedTask && (
-          <Box>
-            <Typography variant="h6" fontWeight="bold" mb={3}>
-              Task Details
-            </Typography>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Task ID:</Typography>
-              <Typography variant="body2" fontFamily="monospace">{selectedTask.id}</Typography>
-            </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Task Type:</Typography>
-              <Typography variant="body2">{selectedTask.taskType}</Typography>
-            </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Status:</Typography>
-              {getStatusChip(selectedTask.status)}
-            </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Assigned User:</Typography>
-              <Typography variant="body2">{selectedTask.assignedUser}</Typography>
-            </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Batch ID:</Typography>
-              <Typography variant="body2" fontFamily="monospace">{selectedTask.batchId}</Typography>
-            </Box>
-            
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Created At:</Typography>
-              <Typography variant="body2">
-                {new Date(selectedTask.createdAt).toLocaleString()}
-              </Typography>
-            </Box>
-
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Inputs:</Typography>
-              <Box
-                component="pre"
-                sx={{
-                  backgroundColor: '#f5f5f5',
-                  padding: 2,
-                  borderRadius: 1,
-                  fontSize: '0.875rem',
-                  overflow: 'auto',
-                  maxHeight: 200
-                }}
-              >
-                {JSON.stringify(selectedTask.inputs, null, 2)}
-              </Box>
-            </Box>
-
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight="bold">Outputs:</Typography>
-              <Box
-                component="pre"
-                sx={{
-                  backgroundColor: '#f5f5f5',
-                  padding: 2,
-                  borderRadius: 1,
-                  fontSize: '0.875rem',
-                  overflow: 'auto',
-                  maxHeight: 200
-                }}
-              >
-                {JSON.stringify(selectedTask.outputs, null, 2)}
-              </Box>
-            </Box>
-          </Box>
-        )}
-      </Drawer>
+      {/* Data Table */}
+      {loading ? (
+        <Box display="flex" justifyContent="center" p={4}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          loading={loading}
+        />
+      )}
 
       {/* Create/Edit Task Drawer */}
-      {showCreateDrawer && (
-        <CreateTaskDrawer
-          batch={batch}
-          onClose={handleDrawerClose}
-          existingTask={editMode ? selectedTask : null}
-        />
+      <CreateTaskDrawer
+        batch={batch}
+        open={showCreateDrawer}
+        onClose={handleDrawerClose}
+        existingTask={editMode ? selectedTask : null}
+      />
+
+      {/* View Task Drawer (if you have one) */}
+      {showViewDrawer && (
+        <Drawer
+          anchor="right"
+          open={showViewDrawer}
+          onClose={() => setShowViewDrawer(false)}
+        >
+          <Box sx={{ width: 400, p: 3 }}>
+            <Typography variant="h6" mb={2}>
+              Task Details
+            </Typography>
+            {selectedTask && (
+              <Box>
+                <Typography variant="body2" mb={1}>
+                  <strong>ID:</strong> {selectedTask.id}
+                </Typography>
+                <Typography variant="body2" mb={1}>
+                  <strong>Type:</strong> {selectedTask.taskType}
+                </Typography>
+                <Typography variant="body2" mb={1}>
+                  <strong>Status:</strong> {selectedTask.status}
+                </Typography>
+                <Typography variant="body2" mb={1}>
+                  <strong>Assigned User:</strong> {selectedTask.assignedUser}
+                </Typography>
+                <Typography variant="body2" mb={1}>
+                  <strong>Created:</strong> {new Date(selectedTask.createdAt).toLocaleString()}
+                </Typography>
+                {selectedTask.completedAt && (
+                  <Typography variant="body2" mb={1}>
+                    <strong>Completed:</strong> {new Date(selectedTask.completedAt).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+        </Drawer>
       )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
-        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogTitle>Delete Task</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to delete this task? This action cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleDeleteCancel} color="inherit">
-            Cancel
-          </Button>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
           <Button 
             onClick={handleDeleteConfirm} 
             color="error" 
-            variant="contained"
             disabled={isDeleteLoading}
           >
-            {isDeleteLoading ? 'Deleting...' : 'Delete'}
+            {isDeleteLoading ? <CircularProgress size={20} /> : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

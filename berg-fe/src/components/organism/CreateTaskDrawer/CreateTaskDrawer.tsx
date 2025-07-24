@@ -24,6 +24,7 @@ import type { RootState, AppDispatch } from '../../../app/store';
 
 interface CreateTaskDrawerProps {
   batch: any;
+  open: boolean;
   onClose: () => void;
   existingTask?: any;
 }
@@ -38,7 +39,7 @@ interface TaskOutput {
   options: string[];
 }
 
-export default function CreateTaskDrawer({ batch, onClose, existingTask }: CreateTaskDrawerProps) {
+export default function CreateTaskDrawer({ batch, open, onClose, existingTask }: CreateTaskDrawerProps) {
   const dispatch = useDispatch<AppDispatch>();
   const { isCreateLoading, isUpdateLoading } = useSelector((state: RootState) => state.tasks);
   const { success, error: showError } = useSnackbar();
@@ -52,6 +53,7 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
   ]);
 
   const isLoading = isCreateLoading || isUpdateLoading;
+  const isEditMode = !!existingTask;
 
   useEffect(() => {
     if (existingTask) {
@@ -64,8 +66,15 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
           { question: '', answerType: 'dropdown', options: [''] }
         ]
       );
+    } else {
+      // Reset form for new task
+      setTaskType('');
+      setAssignedUser('');
+      setStatus('pending'); // Always start new tasks as pending
+      setInputs([{ text: '' }]);
+      setOutputs([{ question: '', answerType: 'dropdown', options: [''] }]);
     }
-  }, [existingTask]);
+  }, [existingTask, open]);
 
   const handleSubmit = async () => {
     if (!taskType.trim() || !assignedUser.trim()) {
@@ -77,7 +86,7 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
       batchId: batch.id,
       taskType: taskType.trim(),
       assignedUser: assignedUser.trim(),
-      status,
+      status: isEditMode ? status : 'pending', // Force pending for new tasks
       inputs: inputs.filter(input => input.text.trim() !== ''),
       outputs: outputs.filter(output => 
         output.question.trim() !== '' && 
@@ -99,7 +108,6 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
     }
   };
 
-  // Input management
   const addInput = () => {
     setInputs([...inputs, { text: '' }]);
   };
@@ -110,13 +118,12 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
     }
   };
 
-  const updateInput = (index: number, value: string) => {
+  const updateInput = (index: number, text: string) => {
     const newInputs = [...inputs];
-    newInputs[index] = { text: value };
+    newInputs[index] = { text };
     setInputs(newInputs);
   };
 
-  // Output management
   const addOutput = () => {
     setOutputs([...outputs, { question: '', answerType: 'dropdown', options: [''] }]);
   };
@@ -127,7 +134,7 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
     }
   };
 
-  const updateOutput = (index: number, field: keyof TaskOutput, value: any) => {
+  const updateOutput = (index: number, field: string, value: any) => {
     const newOutputs = [...outputs];
     newOutputs[index] = { ...newOutputs[index], [field]: value };
     setOutputs(newOutputs);
@@ -156,21 +163,21 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
   return (
     <Drawer
       anchor="right"
-      open={true}
+      open={open}
       onClose={onClose}
       sx={{
         '& .MuiDrawer-paper': {
-          width: 600,
-          padding: 0
+          width: '600px',
+          maxWidth: '90vw'
         }
       }}
     >
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
             <Typography variant="h6" fontWeight="bold">
-              {existingTask ? 'Edit Task' : 'Create New Task'}
+              {isEditMode ? 'Edit Task' : 'Create New Task'}
             </Typography>
             <IconButton onClick={onClose}>
               <CloseIcon />
@@ -207,112 +214,124 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
               placeholder="e.g., user@example.com"
             />
 
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={status}
-                label="Status"
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="in_progress">In Progress</MenuItem>
-                <MenuItem value="annotation_inprogress">Annotation In Progress</MenuItem>
-                <MenuItem value="annotation_inreview">Annotation In Review</MenuItem>
-                <MenuItem value="completed">Completed</MenuItem>
-                <MenuItem value="failed">Failed</MenuItem>
-              </Select>
-            </FormControl>
+            {/* Only show status selector for existing tasks */}
+            {isEditMode && (
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={status}
+                  label="Status"
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="in_progress">In Progress</MenuItem>
+                  <MenuItem value="completed">Completed</MenuItem>
+                  <MenuItem value="failed">Failed</MenuItem>
+                </Select>
+              </FormControl>
+            )}
+
+            {/* Show current status for new tasks */}
+            {!isEditMode && (
+              <Box mt={2}>
+                <Typography variant="body2" color="text.secondary" mb={1}>
+                  Status: New tasks will be created as "Pending"
+                </Typography>
+                <Chip 
+                  label="Pending" 
+                  size="small"
+                  sx={{ 
+                    backgroundColor: '#fee2e2', 
+                    color: '#b91c1c',
+                    fontWeight: 600 
+                  }} 
+                />
+              </Box>
+            )}
           </Box>
 
           <Divider sx={{ my: 3 }} />
 
-          {/* Inputs Section */}
+          {/* Task Inputs */}
           <Box mb={3}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight="bold">
                 Task Inputs
               </Typography>
               <Button
-                size="small"
                 startIcon={<AddIcon />}
                 onClick={addInput}
+                size="small"
                 variant="outlined"
               >
                 Add Input
               </Button>
             </Box>
-
+            
             {inputs.map((input, index) => (
-              <Box key={index} mb={2}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <TextField
-                    fullWidth
-                    label={`Input ${index + 1}`}
-                    value={input.text}
-                    onChange={(e) => updateInput(index, e.target.value)}
-                    multiline
-                    rows={2}
-                    placeholder="Enter the input text or data for this task"
-                  />
-                  {inputs.length > 1 && (
-                    <IconButton
-                      onClick={() => removeInput(index)}
-                      color="error"
-                      size="small"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
-                </Box>
+              <Box key={index} display="flex" gap={1} mb={1}>
+                <TextField
+                  fullWidth
+                  label={`Input ${index + 1}`}
+                  value={input.text}
+                  onChange={(e) => updateInput(index, e.target.value)}
+                  placeholder="Enter input text or description"
+                />
+                <IconButton
+                  onClick={() => removeInput(index)}
+                  disabled={inputs.length === 1}
+                  color="error"
+                >
+                  <DeleteIcon />
+                </IconButton>
               </Box>
             ))}
           </Box>
 
           <Divider sx={{ my: 3 }} />
 
-          {/* Outputs Section */}
+          {/* Task Outputs */}
           <Box mb={3}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="subtitle1" fontWeight="bold">
                 Expected Outputs
               </Typography>
               <Button
-                size="small"
                 startIcon={<AddIcon />}
                 onClick={addOutput}
+                size="small"
                 variant="outlined"
               >
                 Add Output
               </Button>
             </Box>
-
+            
             {outputs.map((output, outputIndex) => (
-              <Box key={outputIndex} mb={3} p={2} border={1} borderColor="grey.300" borderRadius={1}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="subtitle2" fontWeight="bold">
+              <Box key={outputIndex} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2, mb: 2 }}>
+                <Box display="flex" justifyContent="between" alignItems="center" mb={2}>
+                  <Typography variant="body2" fontWeight="bold">
                     Output {outputIndex + 1}
                   </Typography>
-                  {outputs.length > 1 && (
-                    <IconButton
-                      onClick={() => removeOutput(outputIndex)}
-                      color="error"
-                      size="small"
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  )}
+                  <IconButton
+                    onClick={() => removeOutput(outputIndex)}
+                    disabled={outputs.length === 1}
+                    color="error"
+                    size="small"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
                 </Box>
-
+                
                 <TextField
                   fullWidth
-                  label="Question"
+                  label="Question/Label"
                   value={output.question}
                   onChange={(e) => updateOutput(outputIndex, 'question', e.target.value)}
                   margin="normal"
-                  placeholder="What question should this output answer?"
+                  size="small"
                 />
-
-                <FormControl fullWidth margin="normal">
+                
+                <FormControl fullWidth margin="normal" size="small">
                   <InputLabel>Answer Type</InputLabel>
                   <Select
                     value={output.answerType}
@@ -322,47 +341,51 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
                     <MenuItem value="dropdown">Dropdown</MenuItem>
                     <MenuItem value="text">Text</MenuItem>
                     <MenuItem value="number">Number</MenuItem>
-                    <MenuItem value="boolean">Boolean</MenuItem>
+                    <MenuItem value="boolean">Yes/No</MenuItem>
                   </Select>
                 </FormControl>
 
                 {(output.answerType === 'dropdown' || output.answerType === 'boolean') && (
                   <Box mt={2}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                      <Typography variant="body2" fontWeight="bold">
-                        Options
-                      </Typography>
-                      <Button
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => addOption(outputIndex)}
-                        variant="text"
-                      >
-                        Add Option
-                      </Button>
-                    </Box>
-
-                    {output.options.map((option, optionIndex) => (
-                      <Box key={optionIndex} display="flex" alignItems="center" gap={1} mb={1}>
-                        <TextField
-                          fullWidth
+                      <Typography variant="body2">Options</Typography>
+                      {output.answerType === 'dropdown' && (
+                        <Button
                           size="small"
-                          label={`Option ${optionIndex + 1}`}
-                          value={option}
-                          onChange={(e) => updateOption(outputIndex, optionIndex, e.target.value)}
-                          placeholder="Enter option value"
-                        />
-                        {output.options.length > 1 && (
+                          onClick={() => addOption(outputIndex)}
+                          startIcon={<AddIcon />}
+                        >
+                          Add Option
+                        </Button>
+                      )}
+                    </Box>
+                    
+                    {output.answerType === 'boolean' ? (
+                      <Box>
+                        <Chip label="Yes" sx={{ mr: 1 }} />
+                        <Chip label="No" />
+                      </Box>
+                    ) : (
+                      output.options.map((option, optionIndex) => (
+                        <Box key={optionIndex} display="flex" gap={1} mb={1}>
+                          <TextField
+                            fullWidth
+                            label={`Option ${optionIndex + 1}`}
+                            value={option}
+                            onChange={(e) => updateOption(outputIndex, optionIndex, e.target.value)}
+                            size="small"
+                          />
                           <IconButton
                             onClick={() => removeOption(outputIndex, optionIndex)}
+                            disabled={output.options.length === 1}
                             color="error"
                             size="small"
                           >
-                            <DeleteIcon />
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
-                        )}
-                      </Box>
-                    ))}
+                        </Box>
+                      ))
+                    )}
                   </Box>
                 )}
               </Box>
@@ -372,25 +395,16 @@ export default function CreateTaskDrawer({ batch, onClose, existingTask }: Creat
 
         {/* Footer */}
         <Box sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
-          <Box display="flex" gap={2}>
-            <Button
-              variant="outlined"
-              onClick={onClose}
-              fullWidth
-              disabled={isLoading}
-            >
+          <Box display="flex" gap={2} justifyContent="flex-end">
+            <Button variant="outlined" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button
-              variant="contained"
+            <Button 
+              variant="contained" 
               onClick={handleSubmit}
-              fullWidth
               disabled={isLoading}
             >
-              {isLoading 
-                ? (existingTask ? 'Updating...' : 'Creating...') 
-                : (existingTask ? 'Update Task' : 'Create Task')
-              }
+              {isLoading ? 'Saving...' : isEditMode ? 'Update Task' : 'Create Task'}
             </Button>
           </Box>
         </Box>

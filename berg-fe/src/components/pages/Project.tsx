@@ -181,7 +181,7 @@ export default function Project() {
       return {
         name: project.projectName,
         client: project.owner || 'Unassigned',
-        Progress: `${progress}%`,
+        progress: progress,
         Accuracy: `${accuracy}%`,
         Eta: eta,
         Status: status,
@@ -222,11 +222,10 @@ export default function Project() {
     },
     {
       title: 'Progress',
-      field: 'Progress',
-      render: (rowData: string, row: any) => (
+      field: 'progress',
+      render: (rowData: number, row: any) => (
         <Box display="flex" alignItems="center" gap={1}>
-          <ProgressCircle value={parseInt(rowData)} size={30} />
-          <Typography variant="body2">{rowData}</Typography>
+          <ProgressCircle value={rowData || 0} size={30} />
         </Box>
       )
     },
