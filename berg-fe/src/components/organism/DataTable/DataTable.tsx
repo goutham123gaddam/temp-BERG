@@ -37,6 +37,7 @@ const DataTable = ({ columns, rows }: Props) => {
           </BaseTableRow>
         </TableHead>
         <TableBody>
+         
           {rows.map((row, index) => (
             <DataTableRow key={index} row={row} columns={columns} />
           ))}

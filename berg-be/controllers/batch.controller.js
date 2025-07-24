@@ -25,12 +25,17 @@ export const getAllBatches = async (req, res) => {
 export const getBatchesByProjectId = async (req, res) => {
   try {
     const { projectId } = req.query;
+
+    if (!projectId) {
+      return res.status(400).json({ error: "Project ID is required" });
+    }
+
     const batches = await serviceManager
       .getBatchService()
       .getBatchesByProjectId(projectId);
     res.status(200).json(batches);
   } catch (error) {
-    console.error("Error fetching batches by projectId:", error);
+    console.error("Error fetching batches by project ID:", error);
     res.status(500).json({ error: "Failed to fetch batches" });
   }
 };
@@ -67,5 +72,18 @@ export const deleteBatch = async (req, res) => {
   } catch (error) {
     console.error("Error deleting batch:", error);
     res.status(500).json({ error: "Failed to delete batch" });
+  }
+};
+
+// NEW: Get batch statistics for dashboard
+export const getBatchStatistics = async (req, res) => {
+  try {
+    const statistics = await serviceManager
+      .getBatchService()
+      .getBatchStatistics();
+    res.status(200).json(statistics);
+  } catch (error) {
+    console.error("Error fetching batch statistics:", error);
+    res.status(500).json({ error: "Failed to fetch batch statistics" });
   }
 };

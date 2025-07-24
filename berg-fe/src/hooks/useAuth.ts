@@ -16,9 +16,8 @@ export const useAuth = () => {
   };
 
   const logoutUser = () => {
-  dispatch(logout());
- 
-};
+    dispatch(logout());
+  };
 
   const clearAuthError = () => {
     dispatch(clearError());
@@ -41,13 +40,15 @@ export const useAuth = () => {
       if (!token || typeof token !== 'object' || !('access_token' in token)) {
         throw new Error('Invalid Token');
       }
-        const { expires_at } = token
-        if (expires_at < (Date.now() / 1000)) {
-          throw new Error('Token Expired')
-        }
-      return token
 
+      const { expires_at } = token
+      if (expires_at < (Date.now() / 1000)) {
+        throw new Error('Token Expired')
+      }
+
+      return token
     } catch (err) {
+      
       console.log(err)
       dispatch(logout())
       return null

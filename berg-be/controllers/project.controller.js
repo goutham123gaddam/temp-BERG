@@ -56,3 +56,15 @@ export const deleteProject = async (req, res) => {
     res.status(500).json({ error: "Failed to delete project" });
   }
 };
+
+export const getProjectStatistics = async (req, res) => {
+  try {
+    const statistics = await serviceManager
+      .getProjectService()
+      .getProjectStatistics();
+    res.status(200).json(statistics);
+  } catch (error) {
+    console.error("Error fetching project statistics:", error);
+    res.status(500).json({ error: "Failed to fetch project statistics" });
+  }
+};

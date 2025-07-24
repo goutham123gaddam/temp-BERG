@@ -6,10 +6,12 @@ import {
   updateBatch,
   deleteBatch,
   getBatchesByProjectId,
+  getBatchStatistics,
 } from "../controllers/batch.controller.js";
 
 const router = express.Router();
 
+router.get("/statistics", getBatchStatistics);
 router.get("/", getBatchesByProjectId);
 router.get("/:id", getBatchById);
 router.post("/", createBatch);

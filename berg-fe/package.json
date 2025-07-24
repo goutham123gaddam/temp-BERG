@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "build-with-ts": "tsc && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --host 0.0.0.0 --port $PORT"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -17,8 +18,10 @@
     "@mui/material": "^7.2.0",
     "@mui/styled-engine-sc": "^7.2.0",
     "@mui/x-data-grid": "^8.8.0",
+    "@mui/x-date-pickers": "^8.9.0",
     "@reduxjs/toolkit": "^2.8.2",
     "axios": "^1.10.0",
+    "dayjs": "^1.11.13",
     "material-ui-popup-state": "^5.3.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

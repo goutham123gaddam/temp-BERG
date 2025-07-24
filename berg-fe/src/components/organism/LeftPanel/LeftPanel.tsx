@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import RssFeedIcon from '@mui/icons-material/RssFeed';
 import Box from '@mui/material/Box';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
 import SearchInput from '../../molecules/SearchInput/SearchInput';
 import { Typography } from '@mui/material';
 import ProjectSideIcon from '../../../assets/layout/project-side-icon.svg';
@@ -21,6 +22,12 @@ const options = [
     icon: <img src={ProjectSideIcon} alt="ProjectSideIcon" />,
     roleAccess: ['admin', 'user'],
     link: ROUTES_FRONTEND.PROJECTS,
+  },
+   {
+    label: 'Team',
+    icon: <GroupsOutlinedIcon />,
+    roleAccess: ['admin', 'user'],
+    link: ROUTES_FRONTEND.TEAM,
   },
 ];
 

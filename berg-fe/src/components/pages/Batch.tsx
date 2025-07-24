@@ -1,183 +1,310 @@
-import * as React from 'react';
+import React, { useState } from 'react';
 import Box from '@mui/material/Box';
-import { Typography, Avatar } from '@mui/material';
-import BaseAccordion from '../atoms/BaseAccordion/BaseAccordion';
-
+import { Typography, Avatar, CircularProgress, Alert } from '@mui/material';
+import { useNavigate, useParams } from 'react-router-dom';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
-import LinearProgress from '@mui/material/LinearProgress';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import SimCardDownloadOutlinedIcon from '@mui/icons-material/SimCardDownloadOutlined';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
 import DataTable from '../organism/DataTable/DataTable';
-import { useBatches } from '../../hooks/useBatch';
 import ButtonComponent from '../atoms/Button/Button';
-
-import { useParams } from 'react-router-dom';
-import { BATCH_FILTER_OPTION } from '../../constant';
-
-
-import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
-
 import SearchInput from '../molecules/SearchInput/SearchInput';
 import ExternalFilter from '../organism/ExternalFilter/ExternalFilter';
-import StatusChip from '../atoms/StatusChip/StatusChip';
+import BaseAccordion from '../atoms/BaseAccordion/BaseAccordion';
+import TaskTable from './TaskTable'; // Import the TaskTable component
+import { useBatches } from '../../hooks/useBatch';
+import { BATCH_FILTER_OPTION } from '../../constant';
 
+export default function Batch() {
+  const navigate = useNavigate();
+  const { projectId } = useParams<{ projectId: string }>();
+  const { batches, loading, error } = useBatches(projectId);
 
-function Batch() {
-  const { projectId } = useParams();
+  // State for task navigation
+  const [currentView, setCurrentView] = useState<'batches' | 'tasks'>('batches');
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
+  const handleViewTasks = (batch: any) => {
+    setSelectedBatch(batch);
+    setCurrentView('tasks');
+  };
 
-  const { batches, loading, error, fetchBatches, resetBatches } = useBatches();
-  console.log(batches);
-  React.useEffect(() => {
-    if (projectId) {
-      fetchBatches(projectId);
-    }
+  const handleBackToBatches = () => {
+    setCurrentView('batches');
+    setSelectedBatch(null);
+  };
 
-    // optional cleanup
-    return () => {
-      resetBatches();
+  const handleBackToProjects = () => {
+    navigate('/projects');
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  // Filter batches based on search
+  const filteredBatches = React.useMemo(() => {
+    if (!searchQuery.trim()) return batches || [];
+    
+    const query = searchQuery.toLowerCase();
+    return (batches || []).filter(batch => 
+      batch.batchName?.toLowerCase().includes(query) ||
+      batch.slaStatus?.toLowerCase().includes(query)
+    );
+  }, [batches, searchQuery]);
+
+  // If viewing tasks, render TaskTable
+  if (currentView === 'tasks' && selectedBatch) {
+    return (
+      <TaskTable 
+        batch={selectedBatch} 
+        onBack={handleBackToBatches}
+      />
+    );
+  }
+
+  // Get SLA status chip styling
+  const getSlaStatusChip = (status: string) => {
+    const styles = {
+      on_track: { backgroundColor: '#d1fae5', color: '#059669' },
+      at_risk: { backgroundColor: '#fef3c7', color: '#92400e' },
+      overdue: { backgroundColor: '#fee2e2', color: '#dc2626' }
     };
-  }, [projectId]);
+    
+    const style = styles[status as keyof typeof styles] || { backgroundColor: '#e5e7eb', color: '#374151' };
+    
+    return (
+      <Box
+        sx={{
+          px: 2,
+          py: 0.5,
+          borderRadius: 1,
+          backgroundColor: style.backgroundColor,
+          color: style.color,
+          fontWeight: 600,
+          textTransform: 'capitalize',
+          display: 'inline-block',
+          fontSize: '0.875rem'
+        }}
+      >
+        {status.replace('_', ' ')}
+      </Box>
+    );
+  };
 
-
-  const rows = (Array.isArray(batches) ? batches : []).map((batch) => ({
-    batchId: batch.id,
-    batchName: batch.batchName,
-    Progress: batch.Progress,
-    Status: batch.slaStatus,
-    Eta: '5 Days',
-    Status2: batch?.progress === 100 ? 'Completed' : 'Active',
-    btn: batch.id,
-    Manage: 'Manage',
-  }));
-
-
+  // Batch table columns
   const columns = [
     {
-      title: () => <Box>Batch ID</Box>,
+      title: () => <Box>Batch Name</Box>,
       field: 'batchName',
-      render: (rowData: string) => (
+      render: (rowData: string, row: any) => (
         <Box width="100%">
           <Box display="flex" alignItems="center" gap={2}>
-          
+            <Avatar sx={{ color: '#744DCD', bgcolor: '#E8DEFD' }}>
+              {rowData?.charAt(0)?.toUpperCase() || 'B'}
+            </Avatar>
             <Box>
               <Typography fontWeight={500}>{rowData}</Typography>
-            
-
+              <Typography fontSize={13} color="text.secondary">
+                {row.totalTasks || 0} tasks ({row.completedTasks || 0} completed)
+              </Typography>
             </Box>
           </Box>
         </Box>
       )
     },
     {
-      title: 'Project  Name', field: 'client',
-      render: (rowData: string) => <Typography>Product Color Annotation</Typography>
+      title: 'Due Date',
+      field: 'dueDate',
+      render: (rowData: string) => (
+        <Typography variant="body2">
+          {new Date(rowData).toLocaleDateString()}
+        </Typography>
+      )
     },
     {
-      title: 'Progress', field: 'Progress',
-      render: (rowData: string) => (
-        <Box p={1}>
-           <Box >
-             <Typography fontWeight={500}>{rowData}0%</Typography>
-              <LinearProgress variant="determinate" value={2} />
-            </Box>
+      title: 'Progress',
+      field: 'progress',
+      render: (rowData: number) => (
+        <Box display="flex" alignItems="center" gap={1}>
+          <Box
+            sx={{
+              width: 60,
+              height: 8,
+              backgroundColor: '#e5e7eb',
+              borderRadius: 4,
+              overflow: 'hidden'
+            }}
+          >
+            <Box
+              sx={{
+                width: `${rowData || 0}%`,
+                height: '100%',
+                backgroundColor: (rowData || 0) === 100 ? '#059669' : '#3b82f6',
+                transition: 'width 0.3s ease'
+              }}
+            />
+          </Box>
+          <Typography variant="body2" fontSize={12} minWidth={35}>
+            {rowData || 0}%
+          </Typography>
         </Box>
       )
     },
-{
-  title: 'SLA Status',
-  field: 'Status',
-  render: (rowData: string) => {
-    let color = '#019564'; // default color
-
-    if (rowData === 'On Track') {
-      color = 'green';
-    } else if (rowData === 'At Risk') {
-      color = '#981B1B';
-    }
-
-    return <StatusChip label={rowData} color={color} />;
-  }
-}
-,
-   {
-      title: 'Actions', field: 'btn',
-      render: (rowData: string) => (
-        <ButtonComponent buttonVariant="secondary" sx={{ p: 1, px: 1, gap: 1 }} onClick={()=>{}}>
-          <VisibilityOutlinedIcon />
-          View Task
-        </ButtonComponent>
+    {
+      title: 'SLA Status',
+      field: 'slaStatus',
+      render: (rowData: string) => getSlaStatusChip(rowData)
+    },
+    {
+      title: 'Accuracy',
+      field: 'accuracy',
+      render: (rowData: number) => (
+        <Typography variant="body2" color={rowData > 80 ? 'success.main' : 'warning.main'}>
+          {rowData ? `${rowData}%` : 'N/A'}
+        </Typography>
       )
     },
-       {
-      title: '', field: 'btn',
+    {
+      title: 'Created At',
+      field: 'createdAt',
       render: (rowData: string) => (
-        <ButtonComponent buttonVariant="secondary" sx={{ p: 1, gap: 1 }} onClick={()=>{}}>
-          <GroupsOutlinedIcon />
-    
-        </ButtonComponent>
+        <Typography variant="body2">
+          {new Date(rowData).toLocaleDateString()}
+        </Typography>
+      )
+    },
+    {
+      title: 'Actions',
+      field: 'id',
+      render: (rowData: string, row: any) => (
+        <Box display="flex" gap={1}>
+          <ButtonComponent 
+            buttonVariant="secondary" 
+            sx={{ p: 1, px: 1, gap: 1 }}
+            onClick={() => handleViewTasks(row)}
+          >
+            <VisibilityOutlinedIcon />
+            View Tasks
+          </ButtonComponent>
+          <ButtonComponent 
+            buttonVariant="secondary" 
+            sx={{ p: 1, gap: 1 }}
+          >
+            <GroupsOutlinedIcon />
+          </ButtonComponent>
+        </Box>
       )
     }
-  
   ];
+
+  // Transform batch data for table
+  const rows = filteredBatches.map((batch) => ({
+    id: batch.id,
+    batchName: batch.batchName,
+    dueDate: batch.dueDate,
+    progress: batch.progress || 0,
+    slaStatus: batch.slaStatus || 'on_track',
+    accuracy: batch.accuracy || 0,
+    createdAt: batch.createdAt,
+    totalTasks: batch.totalTasks || 0,
+    completedTasks: batch.completedTasks || 0,
+    pendingTasks: batch.pendingTasks || 0,
+    inProgressTasks: batch.inProgressTasks || 0,
+    ...batch // Include all batch data for actions
+  }));
+
   return (
-    <>
-      <Box>
-        <Box display="flex">
-
-          <Box flex={1} display="flex" flexDirection="column" gap={1}>
-            <Typography variant="h5" fontWeight={600}>Batch Management</Typography>
-            <Typography variant="body1">Manage your annotation batches and monitor progress</Typography>
+    <Box>
+      {/* Header Section */}
+      <Box display="flex">
+        <Box flex={1} display="flex" flexDirection="column" gap={1}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <ButtonComponent 
+              buttonVariant="secondary" 
+              onClick={handleBackToProjects}
+              sx={{ minWidth: 'auto', p: 1 }}
+            >
+              <ArrowBackIcon />
+            </ButtonComponent>
+            <Box>
+              <Typography variant="h5" fontWeight={600}>
+                Batch Management
+              </Typography>
+              <Typography variant="body1">
+                Manage your annotation batches and monitor progress
+              </Typography>
+            </Box>
           </Box>
-          <Box flex={1} display="flex" justifyContent="flex-end" gap={1}>
-            <ButtonComponent buttonVariant="secondary" sx={{ height: '56px', width: '150px' }}>
-              <Box display="flex" alignItems="center">
-
-                <span>Import CSV</span>
-              </Box>
-            </ButtonComponent>
-            <ButtonComponent buttonVariant="primary" sx={{ height: '56px', width: '200px' }}>
-              <AddOutlinedIcon />
-              New Batch
-            </ButtonComponent>
-            <ButtonComponent buttonVariant="secondary" sx={{ height: '56px', width: '200px' }}>
-              <BaseAccordion title="View all projects">
-                <div></div>
-
-
-              </BaseAccordion>
-            </ButtonComponent>
-
-            {/* <DrawerFrom open={openDrawer} onOpen={() => setOpenDrawer(true)} onClose={() => setOpenDrawer(false)} /> */}
-          </Box>
-
         </Box>
-        <Box px={2} py={2} display="flex" alignItems="center" gap={2} borderBottom="1px solid #F0F2F5">
-          <SearchInput
-              onSearch={() => { }}
-              placeholder="Search by project name, status, client name"
-              sx={{ background: '#F7F9FC', flex: 1 }}
-            /> 
-
-          <Box display="flex" alignItems="center" gap={2} flex={1}>
-
-
-           <ExternalFilter
-               icon={<FilterAltOutlinedIcon />}
-                triggerLabel="Filter"
-                applyButtonLabel="Apply Filter"
-                groupedOptions={BATCH_FILTER_OPTION}
-                onApplyFilter={() => { }}
-              /> 
+        
+        <Box flex={1} display="flex" justifyContent="flex-end" gap={1}>
+          <ButtonComponent buttonVariant="secondary" sx={{ height: '56px', width: '150px' }}>
+            <Box display="flex" alignItems="center">
+              <SimCardDownloadOutlinedIcon />
+              <span>Import CSV</span>
+            </Box>
+          </ButtonComponent>
+          
+          <ButtonComponent buttonVariant="primary" sx={{ height: '56px', width: '200px' }}>
+            <AddOutlinedIcon />
+            New Batch
+          </ButtonComponent>
+          
+          <Box sx={{ height: '56px', width: '200px' }}>
+            <BaseAccordion title="View all projects">
+              <div></div>
+            </BaseAccordion>
           </Box>
-
         </Box>
-                  <Box>
-            <DataTable columns={columns} rows={rows} />
-          </Box>
       </Box>
-    </>
-  )
-}
 
-export default Batch
+      {/* Search and Filter Section */}
+      <Box px={2} py={2} display="flex" alignItems="center" gap={2} borderBottom="1px solid #F0F2F5">
+        <SearchInput
+          onSearch={handleSearch}
+          placeholder="Search by batch name, status"
+          sx={{ background: '#F7F9FC', flex: 1 }}
+        /> 
+
+        <Box display="flex" alignItems="center" gap={2} flex={1}>
+          <ExternalFilter
+            icon={<FilterAltOutlinedIcon />}
+            triggerLabel="Filter"
+            applyButtonLabel="Apply Filter"
+            groupedOptions={BATCH_FILTER_OPTION}
+            onApplyFilter={() => { }}
+          /> 
+        </Box>
+      </Box>
+
+      {/* Results Info */}
+      <Box px={2} py={1}>
+        <Typography variant="body2" color="text.secondary">
+          Showing {filteredBatches.length} of {batches?.length || 0} batches
+          {searchQuery && ` matching "${searchQuery}"`}
+        </Typography>
+      </Box>
+
+      {/* Data Table */}
+      <Box>
+        {loading ? (
+          <Box p={3} display="flex" alignItems="center" gap={1}>
+            <CircularProgress size={20} />
+            Loading batches...
+          </Box>
+        ) : error ? (
+          <Alert severity="error" sx={{ m: 2 }}>
+            Error loading batches: {error}
+          </Alert>
+        ) : (
+          <DataTable columns={columns} rows={rows} />
+        )}
+      </Box>
+    </Box>
+  );
+}

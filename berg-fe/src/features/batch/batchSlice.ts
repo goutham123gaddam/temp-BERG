@@ -26,6 +26,32 @@ export const getBatchesByProjectId = createAsyncThunk(
   }
 );
 
+export const addBatch = createAsyncThunk(
+  'batch/addBatch',
+  async (
+    payload: { projectId: string; batchName: string; dueDate: string },
+    { getState, rejectWithValue }
+  ) => {
+    const state = getState() as RootState;
+    const token = state.auth.user?.access_token;
+
+    try {
+      const response = await axios.post(
+        `${VITE_API_URL}${ROUTES.ADD_BATCH}`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Error adding batch');
+    }
+  }
+);
+
 interface BatchState {
   batches: any[];
   loading: boolean;
@@ -64,7 +90,19 @@ const batchSlice = createSlice({
       .addCase(getBatchesByProjectId.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      }).addCase(addBatch.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addBatch.fulfilled, (state, action) => {
+        state.loading = false;
+        state.batches.push(action.payload); // optional: add to list
+      })
+      .addCase(addBatch.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
+
   },
 });
 

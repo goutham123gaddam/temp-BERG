@@ -32,7 +32,7 @@ const formSchema: ObjectSchema<FormData> = object({
 
 const DrawerForm: React.FC<DrawerFormProps> = ({ open, onClose, onOpen }) => {
   const { success, error: showError } = useSnackbar()
-  const { handleCreateProject } = useProjects() // ✅ call once
+  const { handleCreateProject } = useProjects() 
 
   const {
     register,
