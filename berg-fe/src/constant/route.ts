@@ -11,6 +11,7 @@ export const ROUTES_BACKEND = {
     GET_BATCHS_ID: '/api/v1/batches?projectId=',
     GET_BATCH_STATISTICS: '/api/v1/batches/statistics',
     ADD_BATCH: '/api/v1/batches',
+    DELETE_BATCH:'/api/v1/batches',
     GET_TASKS: '/api/v1/tasks',
     POST_TASKS: '/api/v1/tasks',
     PUT_TASKS: '/api/v1/tasks',

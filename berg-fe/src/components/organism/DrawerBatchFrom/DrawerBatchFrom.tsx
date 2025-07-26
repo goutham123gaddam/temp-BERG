@@ -13,7 +13,8 @@ import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined';
 import BaseSwipeableDrawer from '../../atoms/BaseSwipeableDrawer/BaseSwipeableDrawer';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useBatches } from '../../../hooks/useBatch';
-import { addBatch } from '../../../features/batch/batchSlice';
+import { createdBatch } from '../../../features/batch/batchSlice';
+import { useProjects } from '../../../hooks/useProjects';
 
 type DrawerFormProps = {
   open: boolean;
@@ -34,7 +35,7 @@ const formSchema = object({
 
 const DrawerBatchForm: React.FC<DrawerFormProps> = ({ open, onClose, onOpen, projectId }) => {
   const { success, error: showError } = useSnackbar();
-  const { addNewBatch, fetchBatches } = useBatches();
+const { createBatch ,refreshBatches } = useBatches(projectId);
   const [loading, setLoading] = useState(false);
 
   const {
@@ -64,19 +65,16 @@ const DrawerBatchForm: React.FC<DrawerFormProps> = ({ open, onClose, onOpen, pro
         batchName: data.batchName,
         dueDate: data.dueDate?.toISOString(),
       };
-    console.log("----->",payload);
-      const result = await addNewBatch(payload);
-
-      if (addBatch.fulfilled.match(result)) {
-        success('Batch created successfully!');
-        fetchBatches(projectId); // Refresh batches
-        reset();
-        onClose();
-      } else {
-        showError(result.payload as string || 'Failed to create batch');
-      }
+      console.log("----->",payload);
+      createBatch(payload);
+      success('Batch created successfully!');
+      refreshBatches();
+      reset();
+      onClose();
     } catch (err) {
+    
       showError('Something went wrong. Please try again.');
+      
     } finally {
       setLoading(false);
     }

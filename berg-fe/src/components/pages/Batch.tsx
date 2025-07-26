@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Box from '@mui/material/Box';
-import { Typography, Avatar, CircularProgress, Alert } from '@mui/material';
+import { Typography, Avatar, CircularProgress, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
@@ -8,7 +8,8 @@ import SimCardDownloadOutlinedIcon from '@mui/icons-material/SimCardDownloadOutl
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
+import DrawerBtachForm from '../organism/DrawerBatchFrom/DrawerBatchFrom'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined';
 import DataTable from '../organism/DataTable/DataTable';
 import ButtonComponent from '../atoms/Button/Button';
 import SearchInput from '../molecules/SearchInput/SearchInput';
@@ -17,16 +18,60 @@ import BaseAccordion from '../atoms/BaseAccordion/BaseAccordion';
 import TaskTable from './TaskTable'; // Import the TaskTable component
 import { useBatches } from '../../hooks/useBatch';
 import { BATCH_FILTER_OPTION } from '../../constant';
+import { useSnackbar } from '../../hooks/useSnackbar';
 
 export default function Batch() {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
-  const { batches, loading, error } = useBatches(projectId);
-
+  const { batches, loading, error, removeBatch } = useBatches(projectId);
+  const { success, error: showError } = useSnackbar();
+  const [isDeleteLoading, setIsDeleteLoading] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   // State for task navigation
   const [currentView, setCurrentView] = useState<'batches' | 'tasks'>('batches');
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [openDrawer, setOpenDrawer] = React.useState(false);
+
+  // --- Move these handlers to top level ---
+  const handleDeleteClick = (batchId: string) => {
+    setProjectToDelete(batchId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!projectToDelete) return;
+    setIsDeleteLoading(true);
+    try {
+      await removeBatch(projectToDelete);
+      success('Batch deleted successfully!');
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    } catch (err) {
+      showError('Failed to delete batch. Please try again.');
+    } finally {
+      setIsDeleteLoading(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setProjectToDelete(null);
+  };
+  // --- End move ---
+
+  console.log(batches);
+  // React.useEffect(() => {
+  //   if (projectId) {
+  //     fetchBatches(projectId);
+  //   }
+
+  //   // optional cleanup
+  //   return () => {
+  //     resetBatches();
+  //   };
+  // }, [projectId]);
 
   const handleViewTasks = (batch: any) => {
     setSelectedBatch(batch);
@@ -68,32 +113,13 @@ export default function Batch() {
   }
 
   // Get SLA status chip styling
-  const getSlaStatusChip = (status: string) => {
+  const getSlaStatusChipStyle = (status: string) => {
     const styles = {
       on_track: { backgroundColor: '#d1fae5', color: '#059669' },
       at_risk: { backgroundColor: '#fef3c7', color: '#92400e' },
       overdue: { backgroundColor: '#fee2e2', color: '#dc2626' }
     };
-    
-    const style = styles[status as keyof typeof styles] || { backgroundColor: '#e5e7eb', color: '#374151' };
-    
-    return (
-      <Box
-        sx={{
-          px: 2,
-          py: 0.5,
-          borderRadius: 1,
-          backgroundColor: style.backgroundColor,
-          color: style.color,
-          fontWeight: 600,
-          textTransform: 'capitalize',
-          display: 'inline-block',
-          fontSize: '0.875rem'
-        }}
-      >
-        {status.replace('_', ' ')}
-      </Box>
-    );
+    return styles[status as keyof typeof styles] || { backgroundColor: '#e5e7eb', color: '#374151' };
   };
 
   // Batch table columns
@@ -120,7 +146,7 @@ export default function Batch() {
     {
       title: 'Due Date',
       field: 'dueDate',
-      render: (rowData: string) => (
+      render: (rowData: string, row: any) => (
         <Typography variant="body2">
           {new Date(rowData).toLocaleDateString()}
         </Typography>
@@ -129,7 +155,7 @@ export default function Batch() {
     {
       title: 'Progress',
       field: 'progress',
-      render: (rowData: number) => (
+      render: (rowData: string, row: any) => (
         <Box display="flex" alignItems="center" gap={1}>
           <Box
             sx={{
@@ -142,15 +168,15 @@ export default function Batch() {
           >
             <Box
               sx={{
-                width: `${rowData || 0}%`,
+                width: `${Number(rowData) || 0}%`,
                 height: '100%',
-                backgroundColor: (rowData || 0) === 100 ? '#059669' : '#3b82f6',
+                backgroundColor: (Number(rowData) || 0) === 100 ? '#059669' : '#3b82f6',
                 transition: 'width 0.3s ease'
               }}
             />
           </Box>
           <Typography variant="body2" fontSize={12} minWidth={35}>
-            {rowData || 0}%
+            {Number(rowData) || 0}%
           </Typography>
         </Box>
       )
@@ -158,13 +184,17 @@ export default function Batch() {
     {
       title: 'SLA Status',
       field: 'slaStatus',
-      render: (rowData: string) => getSlaStatusChip(rowData)
+      render: (rowData: string, row: any) => (
+        <Box sx={{ ...getSlaStatusChipStyle(rowData), borderRadius: 2, px: 1, py: 0.5 }}>
+          {rowData.replace('_', ' ')}
+        </Box>
+      )
     },
     {
       title: 'Accuracy',
       field: 'accuracy',
-      render: (rowData: number) => (
-        <Typography variant="body2" color={rowData > 80 ? 'success.main' : 'warning.main'}>
+      render: (rowData: string, row: any) => (
+        <Typography variant="body2" color={Number(rowData) > 80 ? 'success.main' : 'warning.main'}>
           {rowData ? `${rowData}%` : 'N/A'}
         </Typography>
       )
@@ -172,7 +202,7 @@ export default function Batch() {
     {
       title: 'Created At',
       field: 'createdAt',
-      render: (rowData: string) => (
+      render: (rowData: string, row: any) => (
         <Typography variant="body2">
           {new Date(rowData).toLocaleDateString()}
         </Typography>
@@ -197,12 +227,20 @@ export default function Batch() {
           >
             <GroupsOutlinedIcon />
           </ButtonComponent>
+          <ButtonComponent 
+            buttonVariant="secondary" 
+            sx={{ p: 1, minWidth: 'auto' }}
+            onClick={() => handleDeleteClick(rowData)}
+            disabled={isDeleteLoading}
+          >
+            <DeleteOutlinedIcon fontSize="small" />
+          </ButtonComponent>
         </Box>
       )
     }
   ];
 
-  // Transform batch data for table
+
   const rows = filteredBatches.map((batch) => ({
     id: batch.id,
     batchName: batch.batchName,
@@ -215,7 +253,7 @@ export default function Batch() {
     completedTasks: batch.completedTasks || 0,
     pendingTasks: batch.pendingTasks || 0,
     inProgressTasks: batch.inProgressTasks || 0,
-    ...batch // Include all batch data for actions
+    // ...batch // Do not spread batch to avoid duplicate keys
   }));
 
   return (
@@ -250,16 +288,17 @@ export default function Batch() {
             </Box>
           </ButtonComponent>
           
-          <ButtonComponent buttonVariant="primary" sx={{ height: '56px', width: '200px' }}>
+          <ButtonComponent buttonVariant="primary" sx={{ height: '56px', width: '200px' }} onClick={() => setOpenDrawer(true)}>
             <AddOutlinedIcon />
             New Batch
           </ButtonComponent>
-          
-          <Box sx={{ height: '56px', width: '200px' }}>
-            <BaseAccordion title="View all projects">
-              <div></div>
-            </BaseAccordion>
-          </Box>
+                <DrawerBtachForm
+              open={openDrawer}
+              onOpen={() => setOpenDrawer(true)}
+              onClose={() => setOpenDrawer(false)}
+              projectId={projectId ?? ""}
+            />
+
         </Box>
       </Box>
 
@@ -305,6 +344,22 @@ export default function Batch() {
           <DataTable columns={columns} rows={rows} />
         )}
       </Box>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          Are you sure you want to delete this batch? This action cannot be undone.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} color="inherit">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="error" disabled={isDeleteLoading}>
+            {isDeleteLoading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

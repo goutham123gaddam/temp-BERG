@@ -116,11 +116,7 @@ function Team() {
           {/* <DrawerFrom open={} onOpen={() => {}} onClose={() => ""} /> */}
         </Box>
       </Box>
-        <Box flex={1} display="flex" gap={4} py={2}>
-        <CountBox label="Total No of Team members" count="100" color="#744DCD" icon={<GroupsOutlinedIcon />} />
-        <CountBox label="Total active teams" count="40" color="#744DCD" icon={<ControlPointIcon />} />
-        <CountBox label="Total suspended teams" count="30%" color="#981B1B" icon={<ReportProblemIcon />} />
-      </Box>
+      
           <Box px={2} py={2} display="flex" alignItems="center" gap={2} borderBottom="1px solid #F0F2F5">
         <SearchInput
           onSearch={() => { }}

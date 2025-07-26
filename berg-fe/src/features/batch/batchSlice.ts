@@ -26,7 +26,7 @@ export const getBatchesByProjectId = createAsyncThunk(
   }
 );
 
-export const addBatch = createAsyncThunk(
+export const createdBatch = createAsyncThunk(
   'batch/addBatch',
   async (
     payload: { projectId: string; batchName: string; dueDate: string },
@@ -48,6 +48,27 @@ export const addBatch = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Error adding batch');
+    }
+  }
+);
+export const deleteBatch = createAsyncThunk(
+  'batch/deleteBatch',
+  async (batchId: string, { getState, rejectWithValue }) => {
+    const state = getState() as RootState;
+    const token = state.auth.user?.access_token;
+
+    try {
+      const response = await axios.delete(
+        `${VITE_API_URL}${ROUTES.DELETE_BATCH}/${batchId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return batchId; // return the deleted batch's ID
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Error deleting batch');
     }
   }
 );
@@ -90,18 +111,30 @@ const batchSlice = createSlice({
       .addCase(getBatchesByProjectId.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-      }).addCase(addBatch.pending, (state) => {
+      }).addCase(createdBatch.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(addBatch.fulfilled, (state, action) => {
+      .addCase(createdBatch.fulfilled, (state, action) => {
         state.loading = false;
         state.batches.push(action.payload); // optional: add to list
       })
-      .addCase(addBatch.rejected, (state, action) => {
+      .addCase(createdBatch.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-      });
+      }).addCase(deleteBatch.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteBatch.fulfilled, (state, action) => {
+        state.loading = false;
+        state.batches = state.batches.filter(batch => batch.id !== action.payload);
+      })
+      .addCase(deleteBatch.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
 
   },
 });

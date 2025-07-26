@@ -172,8 +172,8 @@ export default function Project() {
   const rows = React.useMemo(() => {
     return (filteredProjects || []).map((project) => {
       const progress = project.progress || 0;
-      const accuracy = project.accuracy || 0;
-      const totalTasks = project.totalTasks || 0;
+      const accuracy = project?.accuracy || 0;
+      const totalTasks = project?.totalTasks || 0;
       const completedTasks = project.completedTasks || 0;
       const status = progress === 100 ? 'Completed' : 'Active';
       const eta = calculateETA(project);
@@ -289,7 +289,7 @@ export default function Project() {
   return (
     <>
       <Box>
-        {/* Header Section */}
+      
         <Box display="flex">
           <Box flex={1} display="flex" flexDirection="column" gap={1}>
             <Typography variant="h5">All Projects</Typography>
@@ -302,10 +302,7 @@ export default function Project() {
                 <span>Import CSV</span>
               </Box>
             </ButtonComponent>
-            <ButtonComponent buttonVariant="secondary" sx={{ height: '56px', width: '200px' }}>
-              <GroupsOutlinedIcon sx={{ ml: '5px' }} />
-              Team Management
-            </ButtonComponent>
+
             <ButtonComponent buttonVariant="primary" sx={{ height: '56px', width: '200px' }} onClick={() => setOpenDrawer(true)}>
               <AddOutlinedIcon />
               Create Project
@@ -314,8 +311,8 @@ export default function Project() {
           </Box>
         </Box>
 
-        {/* Stats Section */}
-        <Box flex={1} display="flex" gap={4} py={2}>
+       
+        {/* <Box flex={1} display="flex" gap={4} py={2}>
           <CountBox 
             label="Total No of projects" 
             count={projectStats?.totalProjects?.toString() || "0"} 
@@ -334,7 +331,7 @@ export default function Project() {
             color="#744DCD" 
             icon={<PercentIcon />} 
           />
-        </Box>
+        </Box> */}
 
         {/* Search and Filter Section */}
         <Box px={2} py={2} display="flex" alignItems="center" gap={2} borderBottom="1px solid #F0F2F5">
