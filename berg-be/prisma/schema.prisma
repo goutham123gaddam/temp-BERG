@@ -38,17 +38,23 @@ model Batch {
 }
 
 model Task {
-  id           String   @id @default(uuid())
-  taskType     String
-  assignedUser String
-  status       String   @default("pending") // pending, in_progress, completed, failed
-  accuracy     Float?   // Added for tracking individual task accuracy
-  timeSpent    Int?     // Time spent in minutes
-  batch        Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  batchId      String
-  inputs       Json[]
-  outputs      Json[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  completedAt  DateTime? // Added to track when task was completed
+  id                  String   @id @default(uuid())
+  taskType            String
+  assignedUser        String
+  status              String   @default("pending") // pending, in_progress, completed, failed
+  accuracy            Float?   // Added for tracking individual task accuracy
+  timeSpent           Int?     // Time spent in minutes
+  
+  templateType        String?  // Type of annotation template (e.g., "product_classification", "image_tagging")
+  templateData        Json?    // Product data, images, metadata that needs annotation
+  annotationDecision  Json?    // Final annotation decision made by annotator (nullable until completed)
+  
+  inputs              Json[]   // Legacy: Will be replaced by templateData
+  outputs             Json[]   // Legacy: Will be replaced by annotationDecision
+  
+  batch               Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId             String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  completedAt         DateTime? // Added to track when task was completed
 }

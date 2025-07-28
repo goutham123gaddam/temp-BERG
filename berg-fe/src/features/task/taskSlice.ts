@@ -1,11 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import type { RootState } from '../../app/store';
+import type { Task, CreateTaskPayload, UpdateTaskPayload } from '../../types/task';
 
 const VITE_API_URL = import.meta.env.VITE_API_URL;
 
 interface TaskState {
-  items: any[];
+  items: Task[];
   loading: boolean;
   error: string | null;
   isCreateLoading: boolean;
@@ -52,9 +53,49 @@ export const fetchTasks = createAsyncThunk(
   }
 );
 
+// Fetch all tasks (for admin view)
+export const fetchAllTasks = createAsyncThunk(
+  'tasks/fetchAllTasks',
+  async (_, { getState, rejectWithValue }) => {
+    const state = getState() as RootState;
+    const token = state.auth.user?.access_token;
+
+    try {
+      const response = await axios.get(`${VITE_API_URL}/api/v1/tasks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch tasks');
+    }
+  }
+);
+
+// Fetch annotator's assigned tasks
+export const fetchMyTasks = createAsyncThunk(
+  'tasks/fetchMyTasks',
+  async (_, { getState, rejectWithValue }) => {
+    const state = getState() as RootState;
+    const token = state.auth.user?.access_token;
+
+    try {
+      const response = await axios.get(`${VITE_API_URL}/api/v1/tasks/my-tasks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch my tasks');
+    }
+  }
+);
+
 export const createTask = createAsyncThunk(
   'tasks/createTask',
-  async (taskData: any, { getState, rejectWithValue }) => {
+  async (taskData: CreateTaskPayload, { getState, rejectWithValue }) => {
     const state = getState() as RootState;
     const token = state.auth.user?.access_token;
 
@@ -62,6 +103,7 @@ export const createTask = createAsyncThunk(
       const response = await axios.post(`${VITE_API_URL}/api/v1/tasks`, taskData, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
       return response.data;
@@ -73,7 +115,7 @@ export const createTask = createAsyncThunk(
 
 export const updateTask = createAsyncThunk(
   'tasks/updateTask',
-  async ({ id, data }: { id: string; data: any }, { getState, rejectWithValue }) => {
+  async ({ id, data }: { id: string; data: UpdateTaskPayload }, { getState, rejectWithValue }) => {
     const state = getState() as RootState;
     const token = state.auth.user?.access_token;
 
@@ -81,6 +123,7 @@ export const updateTask = createAsyncThunk(
       const response = await axios.put(`${VITE_API_URL}/api/v1/tasks/${id}`, data, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
       return response.data;
@@ -90,7 +133,7 @@ export const updateTask = createAsyncThunk(
   }
 );
 
-// New action specifically for status updates
+// Update task status specifically
 export const updateTaskStatus = createAsyncThunk(
   'tasks/updateTaskStatus',
   async ({ id, status }: { id: string; status: string }, { getState, rejectWithValue }) => {
@@ -98,14 +141,42 @@ export const updateTaskStatus = createAsyncThunk(
     const token = state.auth.user?.access_token;
 
     try {
-      const response = await axios.patch(`${VITE_API_URL}/api/v1/tasks/${id}/status`, { status }, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.patch(`${VITE_API_URL}/api/v1/tasks/${id}/status`, 
+        { status }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.error || 'Failed to update task status');
+    }
+  }
+);
+
+// Update annotation decision
+export const updateAnnotationDecision = createAsyncThunk(
+  'tasks/updateAnnotationDecision',
+  async ({ id, annotationDecision }: { id: string; annotationDecision: any }, { getState, rejectWithValue }) => {
+    const state = getState() as RootState;
+    const token = state.auth.user?.access_token;
+
+    try {
+      const response = await axios.put(`${VITE_API_URL}/api/v1/tasks/${id}/annotation`, 
+        { annotationDecision }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.error || 'Failed to update annotation decision');
     }
   }
 );
@@ -159,6 +230,32 @@ const taskSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
       })
+      // Fetch All Tasks
+      .addCase(fetchAllTasks.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllTasks.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+      })
+      .addCase(fetchAllTasks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch My Tasks
+      .addCase(fetchMyTasks.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchMyTasks.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+      })
+      .addCase(fetchMyTasks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
       // Create Task
       .addCase(createTask.pending, (state) => {
         state.isCreateLoading = true;
@@ -201,6 +298,22 @@ const taskSlice = createSlice({
         }
       })
       .addCase(updateTaskStatus.rejected, (state, action) => {
+        state.isStatusUpdateLoading = false;
+        state.isStatusUpdateError = action.payload as string;
+      })
+      // Update Annotation Decision
+      .addCase(updateAnnotationDecision.pending, (state) => {
+        state.isStatusUpdateLoading = true;
+        state.isStatusUpdateError = null;
+      })
+      .addCase(updateAnnotationDecision.fulfilled, (state, action) => {
+        state.isStatusUpdateLoading = false;
+        const index = state.items.findIndex(task => task.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      })
+      .addCase(updateAnnotationDecision.rejected, (state, action) => {
         state.isStatusUpdateLoading = false;
         state.isStatusUpdateError = action.payload as string;
       })

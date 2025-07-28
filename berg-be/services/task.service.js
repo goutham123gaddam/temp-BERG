@@ -10,22 +10,32 @@ export class TaskService {
     const taskData = {
       ...data,
       status: data.status || "pending",
+      templateType: data.templateType || null,
+      templateData: data.templateData || null,
+      annotationDecision: null, // Always null for new tasks
+      // Keep legacy fields for backward compatibility
+      inputs: data.inputs || [],
+      outputs: data.outputs || [],
     };
 
     const newTask = await this.prisma.task.create({
       data: taskData,
       include: {
         batch: {
-          select: {
-            id: true,
-            projectId: true,
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
           },
         },
       },
     });
 
     // Recalculate metrics after creating a new task
-    await this.recalculateProjectMetrics(newTask.batch.projectId);
+    await this.recalculateProjectMetrics(newTask.batch.project.id);
     await this.recalculateBatchMetrics(newTask.batchId);
 
     return newTask;
@@ -33,6 +43,18 @@ export class TaskService {
 
   async getAllTasks() {
     return this.prisma.task.findMany({
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -42,15 +64,121 @@ export class TaskService {
   async getTasksByBatchId(batchId) {
     return this.prisma.task.findMany({
       where: batchId ? { batchId } : {},
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
     });
   }
 
+  /**
+   * Get tasks assigned to a specific user (for annotator view)
+   * @param {string} assignedUser - User email/identifier
+   */
+  async getMyTasks(assignedUser) {
+    return this.prisma.task.findMany({
+      where: {
+        assignedUser,
+        status: {
+          in: ["pending", "in_progress"], // Only pending and in_progress tasks for annotators
+        },
+      },
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { status: "asc" }, // Pending tasks first
+        { createdAt: "desc" },
+      ],
+    });
+  }
+
+  /**
+   * Get tasks with role-based filtering (NOT USED)
+   * @param {string} userRole - 'admin', 'annotator', etc.
+   * @param {string} userId - User identifier
+   * @param {Object} filters - Additional filters
+   */
+  async getTasksWithRoleFilter(userRole, userId, filters = {}) {
+    let whereClause = {};
+
+    // Role-based filtering
+    if (userRole === "annotator") {
+      whereClause.assignedUser = userId;
+    }
+
+    // Apply additional filters
+    if (filters.status && filters.status.length > 0) {
+      whereClause.status = { in: filters.status };
+    }
+
+    if (filters.templateType && filters.templateType.length > 0) {
+      whereClause.templateType = { in: filters.templateType };
+    }
+
+    if (filters.dateRange) {
+      whereClause.createdAt = {
+        gte: new Date(filters.dateRange.start),
+        lte: new Date(filters.dateRange.end),
+      };
+    }
+
+    return this.prisma.task.findMany({
+      where: whereClause,
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { status: "asc" }, // Pending tasks first
+        { createdAt: "desc" },
+      ],
+    });
+  }
+
   async getTaskById(id) {
     return this.prisma.task.findUnique({
       where: { id },
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -60,10 +188,12 @@ export class TaskService {
       where: { id },
       include: {
         batch: {
-          select: {
-            id: true,
-            dueDate: true,
-            projectId: true,
+          include: {
+            project: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -73,26 +203,48 @@ export class TaskService {
       throw new Error("Task not found");
     }
 
+    // Prepare update data
+    const updateData = { ...data };
+
+    // If annotation decision is being updated, automatically mark as completed
+    if (data.annotationDecision) {
+      updateData.status = "completed";
+      updateData.completedAt = new Date();
+    }
+
+    // If status is being updated to completed, set completedAt
+    if (data.status === "completed" && !updateData.completedAt) {
+      updateData.completedAt = new Date();
+    }
+
+    // If status is not completed, clear completedAt
+    if (data.status && data.status !== "completed") {
+      updateData.completedAt = null;
+    }
+
     const updatedTask = await this.prisma.task.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         batch: {
-          select: {
-            id: true,
-            dueDate: true,
-            projectId: true,
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
           },
         },
       },
     });
 
     const { batchId, batch } = updatedTask;
-    const { projectId } = batch;
+    const { project } = batch;
 
     // Recalculate metrics if status changed
     if (currentTask.status !== updatedTask.status) {
-      await this.recalculateProjectMetrics(projectId);
+      await this.recalculateProjectMetrics(project.id);
       await this.recalculateBatchMetrics(batchId);
     }
 
@@ -105,9 +257,12 @@ export class TaskService {
       where: { id },
       include: {
         batch: {
-          select: {
-            id: true,
-            projectId: true,
+          include: {
+            project: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -122,10 +277,111 @@ export class TaskService {
     });
 
     // Recalculate metrics after deletion
-    await this.recalculateProjectMetrics(task.batch.projectId);
+    await this.recalculateProjectMetrics(task.batch.project.id);
     await this.recalculateBatchMetrics(task.batchId);
 
     return { success: true };
+  }
+
+  /**
+   * Update annotation decision for a task (primary annotator action)
+   * @param {string} id Task ID
+   * @param {Object} annotationDecision Annotation decision data
+   */
+  async updateAnnotationDecision(id, annotationDecision) {
+    const updatedTask = await this.prisma.task.update({
+      where: { id },
+      data: {
+        annotationDecision,
+        status: "completed",
+        completedAt: new Date(),
+      },
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Recalculate metrics
+    await this.recalculateProjectMetrics(updatedTask.batch.project.id);
+    await this.recalculateBatchMetrics(updatedTask.batchId);
+
+    return updatedTask;
+  }
+
+  /**
+   * Get tasks by template type (NOT USED)
+   * @param {string} templateType Template type to filter by
+   */
+  async getTasksByTemplateType(templateType) {
+    return this.prisma.task.findMany({
+      where: { templateType },
+      include: {
+        batch: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                projectName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
+  /**
+   * Get task statistics for dashboard
+   */
+  async getTaskStatistics(filters = {}) {
+    let whereClause = {};
+
+    if (filters.assignedUser) {
+      whereClause.assignedUser = filters.assignedUser;
+    }
+
+    if (filters.templateType) {
+      whereClause.templateType = filters.templateType;
+    }
+
+    const tasks = await this.prisma.task.findMany({
+      where: whereClause,
+    });
+
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(
+      (task) => task.status === "completed"
+    ).length;
+    const inProgressTasks = tasks.filter(
+      (task) => task.status === "in_progress"
+    ).length;
+    const pendingTasks = tasks.filter(
+      (task) => task.status === "pending"
+    ).length;
+    const failedTasks = tasks.filter((task) => task.status === "failed").length;
+
+    const progress =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      pendingTasks,
+      failedTasks,
+      progress,
+    };
   }
 
   /**
@@ -216,77 +472,5 @@ export class TaskService {
     });
 
     return { totalTasks, completedTasks, progress, slaStatus };
-  }
-
-  /**
-   * Get task statistics for a specific batch
-   * @param {string} batchId
-   */
-  async getTaskStatistics(batchId) {
-    const tasks = await this.prisma.task.findMany({
-      where: { batchId },
-    });
-
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(
-      (task) => task.status === "completed"
-    ).length;
-    const inProgressTasks = tasks.filter(
-      (task) => task.status === "in_progress"
-    ).length;
-    const pendingTasks = tasks.filter(
-      (task) => task.status === "pending"
-    ).length;
-    const failedTasks = tasks.filter((task) => task.status === "failed").length;
-
-    const progress =
-      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    return {
-      totalTasks,
-      completedTasks,
-      inProgressTasks,
-      pendingTasks,
-      failedTasks,
-      progress,
-    };
-  }
-
-  /**
-   * Get task statistics for a specific project
-   * @param {string} projectId
-   */
-  async getProjectTaskStatistics(projectId) {
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        batch: {
-          projectId,
-        },
-      },
-    });
-
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(
-      (task) => task.status === "completed"
-    ).length;
-    const inProgressTasks = tasks.filter(
-      (task) => task.status === "in_progress"
-    ).length;
-    const pendingTasks = tasks.filter(
-      (task) => task.status === "pending"
-    ).length;
-    const failedTasks = tasks.filter((task) => task.status === "failed").length;
-
-    const progress =
-      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    return {
-      totalTasks,
-      completedTasks,
-      inProgressTasks,
-      pendingTasks,
-      failedTasks,
-      progress,
-    };
   }
 }

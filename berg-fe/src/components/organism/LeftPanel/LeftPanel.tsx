@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import RssFeedIcon from '@mui/icons-material/RssFeed';
 import Box from '@mui/material/Box';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import SearchInput from '../../molecules/SearchInput/SearchInput';
 import { Typography } from '@mui/material';
 import ProjectSideIcon from '../../../assets/layout/project-side-icon.svg';
@@ -9,12 +10,13 @@ import DashboardIcon from '../../../assets/layout/home-side-icon.svg';
 import { ROUTES_FRONTEND } from '../../../constant/route';
 import { useNavigate, useLocation } from 'react-router-dom';
 import UserProfile from '../../molecules/Userprofile/UserProfile';
+import { getCurrentUserRole, getCurrentUserName } from '../../../utils/roleUtils';
 
 const options = [
   {
     label: 'Dashboard',
     icon: <img src={DashboardIcon} alt="DashboardIcon" />,
-    roleAccess: ['admin', 'user'],
+    roleAccess: ['admin', 'user', 'annotator'],
     link: ROUTES_FRONTEND.DASHBOARD,
   },
   {
@@ -22,6 +24,12 @@ const options = [
     icon: <img src={ProjectSideIcon} alt="ProjectSideIcon" />,
     roleAccess: ['admin', 'user'],
     link: ROUTES_FRONTEND.PROJECTS,
+  },
+  {
+    label: 'Tasks',
+    icon: <AssignmentIcon />,
+    roleAccess: ['admin', 'user', 'annotator'],
+    link: ROUTES_FRONTEND.TASKS,
   },
    {
     label: 'Team',
@@ -34,12 +42,24 @@ const options = [
 export default function LeftPanel() {
   const navigate = useNavigate();
   const location = useLocation();
-  const userRole = 'admin'; // Replace with actual logic from context/store/auth
 
   const [active, setActive] = useState(location.pathname);
-  const [tabs, setTabs] = useState(() =>
-    options.filter((item) => item.roleAccess.includes(userRole))
-  );
+  const [tabs, setTabs] = useState<typeof options>([]);
+
+  // Get user role using utility function
+  const userRole = getCurrentUserRole();
+  const userName = getCurrentUserName();
+  
+  // Get email for UserProfile (legacy support)
+  const userDataString = localStorage.getItem('user');
+  const userData = userDataString ? JSON.parse(userDataString) : null;
+  const userEmail = userData?.user?.email || '';
+
+  useEffect(() => {
+    // Filter options based on user role
+    const filteredOptions = options.filter((item) => item.roleAccess.includes(userRole));
+    setTabs(filteredOptions);
+  }, [userRole]);
 
   const handleSearch = (value: string) => {
     const filtered = options
@@ -53,12 +73,6 @@ export default function LeftPanel() {
   useEffect(() => {
     setActive(location.pathname);
   }, [location.pathname]);
-
-  // Fetch user data from localStorage
-  const userDataString = localStorage.getItem('user');
-  const userData = userDataString ? JSON.parse(userDataString) : null;
-  const role = userData?.user?.email;
-  const name = userData?.user?.user_metadata?.name || role?.split('@')[0];
 
   return (
     <Box
@@ -104,8 +118,8 @@ export default function LeftPanel() {
       </ul>
       <Box sx={{ mt: 'auto' ,pb:8}}>
         <UserProfile
-          name={name}
-          role={role}
+          name={userName}
+          role={userEmail}
           avatarUrl="https://via.placeholder.com/150"
         />
       </Box>

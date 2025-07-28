@@ -1,8 +1,8 @@
 export const mockAuthMiddleware = (req, res, next) => {
   req.user = {
     id: "1234",
-    email: "admin@bergflow.com",
-    role: "admin",
+    email: "annotator1@bergflow.com",
+    role: "annotator",
   };
   next();
 };

@@ -8,6 +8,7 @@ import Layout from './components/utils/Layout';
 import Dashboard from './components/pages/Dashboard';
 import Project from './components/pages/Project';
 import Batch from './components/pages/Batch';
+import Tasks from './components/pages/Tasks';
 
 import {PrivateRoute} from './components/utils/PrivateRoute';
 import {PublicOnlyRoute} from './components/utils/PublicOnlyRoute';
@@ -31,6 +32,7 @@ export default function App() {
                 <Route path={ROUTES_FRONTEND.DASHBOARD} element={<Dashboard />} />
                 <Route path={ROUTES_FRONTEND.PROJECTS} element={<Project />} />
                 <Route path={ROUTES_FRONTEND.BATCH} element={<Batch />} />
+                <Route path={ROUTES_FRONTEND.TASKS} element={<Tasks />} />
                 <Route path={ROUTES_FRONTEND.TEAM} element={<Team/>} />
             </Route>
         </Route>

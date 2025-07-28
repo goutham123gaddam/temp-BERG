@@ -16,6 +16,9 @@ export const ROUTES_BACKEND = {
     POST_TASKS: '/api/v1/tasks',
     PUT_TASKS: '/api/v1/tasks',
     DELETE_TASKS: '/api/v1/tasks',
+    GET_MY_TASKS: '/api/v1/tasks/my-tasks', // New endpoint for annotator tasks
+    GET_TASK_STATISTICS: '/api/v1/tasks/statistics', // New endpoint for task stats
+    UPDATE_ANNOTATION: '/api/v1/tasks/:id/annotation', // New endpoint for annotations
 }
 
 export const ROUTES_FRONTEND = {
@@ -28,6 +31,7 @@ export const ROUTES_FRONTEND = {
     DASHBOARD: '/dashboard',
     PROJECTS: '/projects',
     BATCH: '/projects/:projectId/batches',
-    TASKS: '/projects/:projectId/batches/:batchId/tasks',
+    TASKS: '/tasks', // New standalone tasks route
+    BATCH_TASKS: '/projects/:projectId/batches/:batchId/tasks', // Keep existing nested route
     TEAM:'/team'
 }
